@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>FindTask</title>
+    <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/dijit/themes/tundra/tundra.css" />
+    <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/esri/css/esri.css" />
+    <script type="text/Javascript" src="http://127.0.0.1/arcgis_js_v325_api/init.js"></script>
+    <style>
+        html,
+        body {
+            height: 99%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .MapClass {
+            width: 60%;
+            height: 100%;
+            border: 1px solid #000;
+        }
+
+        .panelClass {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 39%;
+            height: 99%;
+            border: 1px solid #000;
+        }
+    </style>
+    <script>
+        require(["esri/map",
+            "esri/geometry/Extent",
+            "esri/SpatialReference",
+            "dojo/dom",
+            "dojo/on",
+            'esri/request',
+            'dojo/Deferred',
+            'dojo/dom-construct',
+            "esri/toolbars/draw",
+            "esri/geometry/Polygon",
+            "esri/layers/ArcGISDynamicMapServiceLayer",
+            "esri/layers/ArcGISTiledMapServiceLayer",
+            "esri/graphic",
+            "esri/layers/FeatureLayer",
+            "esri/layers/GraphicsLayer",
+            "esri/tasks/FindParameters",
+            "esri/tasks/FindTask",
+            'dojo/_base/lang',
+            "esri/symbols/SimpleMarkerSymbol",
+            "esri/symbols/SimpleLineSymbol",
+            "esri/symbols/SimpleFillSymbol",
+            "esri/renderers/SimpleRenderer",
+            "dojo/colors",
+            "dojo/query",
+            "esri/tasks/StatisticDefinition",
+            "dojo/domReady!"
+        ], function (
+            Map,
+            Extent,
+            SpatialReference,
+            dom,
+            on,
+            esriRequest,
+            Deferred,
+            domCon,
+            Draw,
+            Polygon,
+            ArcGISDynamicMapServiceLayer,
+            ArcGISTiledMapServiceLayer,
+            Graphic,
+            FeatureLayer,
+            GraphicsLayer,
+            FindParameters,
+            FindTask,
+            lang,
+            SimpleMarkerSymbol,
+            SimpleLineSymbol,
+            SimpleFillSymbol,
+            SimpleRenderer,
+            Color,
+            query,
+            StatisticDefinition
+        ) {
+            var map = new Map("mapDiv", {
+                extent: new Extent({
+                    xmin: 606791,
+                    ymin: 2703045,
+                    xmax: 621164,
+                    ymax: 2717376,
+                    spatialReference: {
+                        wkid: 4548
+                    }
+                })
+            });
+
+            var MapServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer"
+            var FeatureServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
+
+            var findTask = new FindTask(FeatureServerUrl)
+
+            var pointSymbol = new SimpleMarkerSymbol(
+                SimpleMarkerSymbol.STYLE_CIRCLE,
+                5,
+                new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID,
+                    new Color([0, 0, 0]), 1),
+                new Color([255, 0, 0, 1])
+            );
+            var lineSymbol = new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, new Color([0, 0, 0]), 1);
+            var polygonSymbol = new SimpleFillSymbol().setColor(new Color([255, 0, 0, 0.25]));
+            var selectSymbol = new SimpleFillSymbol().setColor(new Color([255, 255, 0, 0.25]));
+
+            var layer = new ArcGISTiledMapServiceLayer(MapServerUrl); // ArcGISDynamicMapServiceLayer
+            map.addLayer(layer);
+            var graphicsLayer = new GraphicsLayer();
+            map.addLayer(graphicsLayer);
+
+            var ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(FeatureServerUrl);
+            ArcGISDynamicMapServiceLayer.visibleLayers=[0]
+
+            event();
+
+            function event() {
+                on(dom.byId('Query'), 'click', lang.hitch(this, _doQuery))
+            }
+
+            function _doQuery() {
+                //定义查询参数
+                var findParameters = new FindParameters();
+                
+                dom.byId('result').innerHTML = 'loading';
+
+                findParameters.layerIds = dom.byId('Layers').value.split(",");
+                var LayerDefinitions = dom.byId('LayerDefinitions').value.split(",");
+                findParameters.layerDefinitions = [];
+                if (LayerDefinitions[0] !== "") {
+                    for (var i = 0; i < LayerDefinitions.length; i++) {
+                        var item = LayerDefinitions[i];
+                        item = item.split(":");
+                        findParameters.layerDefinitions[item[0]] = item[1];
+                    }
+                }
+
+                findParameters.searchFields = dom.byId('searchFields').value.split(",");;
+                findParameters.searchText = dom.byId('searchText').value;
+                findParameters.maxAllowableOffset = dom.byId('maxAllowableOffset').value;
+                findParameters.geometryPrecision = dom.byId('GeometryPrecision').value;
+
+                findParameters.contains = true;
+                findParameters.returnGeometry = true;
+
+                findTask.execute(findParameters, function (e) {
+                    graphicsLayer.clear();
+                    dom.byId('result').innerHTML = ''
+                    var symbol = null;
+
+                    domCon.create('label', {
+                        innerHTML: "数量："+e.length
+                    }, dom.byId('result'));
+                    domCon.create('br', {}, dom.byId('result'));
+                    for (var i = 0; i < e.length; i++) {
+                        switch (e[i].geometryType) {
+                            case "esriGeometryPoint":
+                                symbol = pointSymbol;
+                                break;
+                            case "esriGeometryPolygon":
+                                symbol = polygonSymbol;
+                                break;
+                            default:
+                                symbol = lineSymbol;
+                                break;
+                        }
+                        var item = e[i].feature;
+                        item.symbol = symbol;
+                        graphicsLayer.add(item);
+
+                        domCon.create('label', {
+                            innerHTML: JSON.stringify(item.attributes)
+                        }, dom.byId('result'));
+                        domCon.create('br', {}, dom.byId('result'));
+                        domCon.create('br', {}, dom.byId('result'));
+                    }
+                })
+            }
+        });
+    </script>
+</head>
+
+<body>
+    <div id="mapDiv" class="MapClass"></div>
+    <div id="panel" class="panelClass" style="font-size: 20px; overflow-y:scroll;WORD-WRAP:break-word">
+        <button id="Query">查询</button>
+
+        <br>
+        <label>Layers:</label>
+        <input type="text" id="Layers" value="50" size="75">
+        <br>
+        <label>Layer Definitions:</label>
+        <input type="text" id="LayerDefinitions" value="50:QDM='思明区'" size="60">
+        <br>
+        <label>searchFields:</label>
+        <input type="text" id="searchFields" value="学区名称">
+        <br>
+        <label>searchText:</label>
+        <input type="text" id="searchText" value="五缘第二实验学校（小学）">
+        <br>
+        <label>Max Allowable Offset:</label>
+        <input type="text" id="maxAllowableOffset" value="">
+        <br>
+        <label>Geometry Precision:</label>
+        <input type="text" id="GeometryPrecision" value="">
+        <br>
+        <label>查询结果:</label>
+        <br>
+        <div id="result">
+        </div>
+    </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>QueryTask</title>
+    <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/dijit/themes/tundra/tundra.css" />
+    <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/esri/css/esri.css" />
+    <script type="text/Javascript" src="http://127.0.0.1/arcgis_js_v325_api/init.js"></script>
+    <style>
+        html,
+        body {
+            height: 99%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .MapClass {
+            width: 60%;
+            height: 100%;
+            border: 1px solid #000;
+        }
+
+        .panelClass {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 39%;
+            height: 99%;
+            border: 1px solid #000;
+        }
+    </style>
+    <script>
+        require(["esri/map",
+            "esri/geometry/Extent",
+            "esri/SpatialReference",
+            "dojo/dom",
+            "dojo/on",
+            'esri/request',
+            'dojo/Deferred',
+            'dojo/dom-construct',
+            "esri/toolbars/draw",
+            "esri/geometry/Polygon",
+            "esri/layers/ArcGISDynamicMapServiceLayer",
+            "esri/layers/ArcGISTiledMapServiceLayer",
+            "esri/graphic",
+            "esri/layers/FeatureLayer",
+            "esri/layers/GraphicsLayer",
+            "esri/tasks/query",
+            "esri/tasks/QueryTask",
+            'dojo/_base/lang',
+            "esri/symbols/SimpleMarkerSymbol",
+            "esri/symbols/SimpleLineSymbol",
+            "esri/symbols/SimpleFillSymbol",
+            "esri/renderers/SimpleRenderer",
+            "dojo/colors",
+            "dojo/query",
+            "esri/tasks/StatisticDefinition",
+            "dojo/domReady!"
+        ], function (
+            Map,
+            Extent,
+            SpatialReference,
+            dom,
+            on,
+            esriRequest,
+            Deferred,
+            domCon,
+            Draw,
+            Polygon,
+            ArcGISDynamicMapServiceLayer,
+            ArcGISTiledMapServiceLayer,
+            Graphic,
+            FeatureLayer,
+            GraphicsLayer,
+            Query,
+            QueryTask,
+            lang,
+            SimpleMarkerSymbol,
+            SimpleLineSymbol,
+            SimpleFillSymbol,
+            SimpleRenderer,
+            Color,
+            query,
+            StatisticDefinition
+        ) {
+            var map = new Map("mapDiv", {
+                extent: new Extent({
+                    xmin: 606791,
+                    ymin: 2703045,
+                    xmax: 621164,
+                    ymax: 2717376,
+                    spatialReference: {
+                        wkid: 4548
+                    }
+                })
+            });
+
+            var MapServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer"
+            var FeatureServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
+            var layerID = "0"
+            var queryTask = new QueryTask(FeatureServerUrl + layerID)
+
+            var pointSymbol = new SimpleMarkerSymbol(
+                SimpleMarkerSymbol.STYLE_CIRCLE,
+                5,
+                new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID,
+                    new Color([0, 0, 0]), 1),
+                new Color([255, 0, 0, 1])
+            );
+            var lineSymbol = new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, new Color([0, 0, 0]), 1);
+            var polygonSymbol = new SimpleFillSymbol().setColor(new Color([255, 0, 0, 0.25]));
+            var selectSymbol = new SimpleFillSymbol().setColor(new Color([255, 255, 0, 0.25]));
+
+            var layer = new ArcGISTiledMapServiceLayer(MapServerUrl); // ArcGISDynamicMapServiceLayer
+            map.addLayer(layer);
+            var graphicsLayer = new GraphicsLayer();
+            map.addLayer(graphicsLayer);
+
+            // 绘制工具
+            var d = new Draw(map, {
+                showTooltips: true
+            });
+
+            event();
+
+            // 获取图层信息
+            getLayerInfos(FeatureServerUrl).then(function (result) {
+                var DOM = dom.byId('layers')
+                for (var i = 0; i < result.length; i++) {
+                    var item = result[i];
+                    domCon.create('option', {
+                        value: item.id,
+                        innerHTML: item.name
+                    }, DOM)
+                }
+            })
+
+            function event() {
+                on(dom.byId('Query'), 'click', lang.hitch(this, _doQuery))
+                on(dom.byId('Draw'), 'click', _doDraw);
+                on(dom.byId('clearDraw'), 'click', lang.hitch(this, clearDraw));
+                on(d, "draw-complete", lang.hitch(this, function (result) {
+                    this.graphic = new Graphic(result.geometry, selectSymbol, {});
+                    map.graphics.clear();
+                    map.graphics.add(this.graphic);
+                    d.deactivate();
+                }));
+                on(dom.byId('layers'), 'change', layerChange)
+            }
+
+            function _doQuery() {
+                dom.byId('result').innerHTML = 'loading';
+
+                //定义查询参数
+                var query = new Query();
+                query.where = dom.byId('where').value;
+                query.objectIds = dom.byId('objectIds').value.split(",");
+                query.outFields = dom.byId('outFields').value.split(",");
+                if (this.graphic) {
+                    query.geometry = this.graphic.geometry;
+                }
+                query.spatialRelationship = Query[dom.byId('spatialRel').options[dom.byId('spatialRel')
+                    .selectedIndex].value];
+                query.maxAllowableOffset = dom.byId('maxAllowableOffset').value;
+                query.geometryPrecision = dom.byId('GeometryPrecision').value;
+                query.outSpatialReference = new SpatialReference({
+                    wkid: dom.byId('OutSR').value
+                });
+                query.orderByFields = dom.byId('OrderByFields').value.split(",");
+                query.groupByFieldsForStatistics = dom.byId('GroupByFields').value.split(",");
+
+
+                // var statisticDefinition = new StatisticDefinition();
+                // statisticDefinition.statisticType = "count";
+                // statisticDefinition.onStatisticField = "年龄";
+                // statisticDefinition.outStatisticFieldName = "数量";
+                // query.outStatistics = [statisticDefinition];
+                query.returnGeometry = true;
+
+                queryTask.execute(query, function (e) {
+                    graphicsLayer.clear();
+                    dom.byId('result').innerHTML = ''
+                    var symbol = null;
+                    switch (e.geometryType) {
+                        case "esriGeometryPoint":
+                            symbol = pointSymbol;
+                            break;
+                        case "esriGeometryPolygon":
+                            symbol = polygonSymbol;
+                            break;
+                        default:
+                            symbol = lineSymbol;
+                            break;
+                    }
+                    domCon.create('label', {
+                        innerHTML: "数量：" + e.features.length
+                    }, dom.byId('result'));
+                    domCon.create('br', {}, dom.byId('result'));
+                    for (var i = 0; i < e.features.length; i++) {
+                        var item = e.features[i];
+                        item.symbol = symbol;
+                        graphicsLayer.add(item);
+
+                        domCon.create('label', {
+                            innerHTML: JSON.stringify(item.attributes)
+                        }, dom.byId('result'));
+                        domCon.create('br', {}, dom.byId('result'));
+                        domCon.create('br', {}, dom.byId('result'));
+                    }
+                })
+            }
+
+            function _doDraw(params) {
+                d.activate(Draw.POLYGON);
+            }
+
+            function clearDraw() {
+                this.graphic = null;
+                map.graphics.clear();
+            }
+
+            function getLayerInfos(url) {
+                var deferred = new Deferred();
+                esriRequest({
+                    url: url,
+                    content: {
+                        f: 'json'
+                    },
+                    handleAs: 'json',
+                    callbackParamName: 'callback'
+                }).then(lang.hitch(this, function (result) {
+                    deferred.resolve(result.layers);
+                }), function (err) {
+                    console.error(err.message || err);
+                    deferred.resolve(null);
+                });
+                return deferred;
+            }
+
+            function layerChange() {
+                var objS = dom.byId("layers");
+                layerID = objS.options[objS.selectedIndex].value;
+                queryTask = new QueryTask(FeatureServerUrl + layerID);
+            }
+        });
+    </script>
+</head>
+
+<body>
+    <div id="mapDiv" class="MapClass"></div>
+    <div id="panel" class="panelClass" style="font-size: 20px; overflow-y:scroll;WORD-WRAP:break-word">
+        <button id="Query">查询</button>
+        <button id="Draw">绘制区域</button>
+        <button id="clearDraw">清除区域</button>
+        <label>图层选择:</label>
+        <select id="layers">
+        </select>
+        <br>
+        <label>Where:</label>
+        <input type="text" id="where" value="OBJECTID < 100" size="75">
+        <br>
+        <label>Object IDs:</label>
+        <input type="text" id="objectIds" value="" size="60">
+        <br>
+        <label>Input Spatial Reference:</label>
+        <input type="text" id="inSR" value="" size="60"></>
+        <br>
+        <label>Spatial Relationship:</label>
+        <select id="spatialRel">
+            <option value="SPATIAL_REL_INTERSECTS" selected="true">Intersects</option>
+            <option value="SPATIAL_REL_CONTAINS">Contains</option>
+            <option value="SPATIAL_REL_CROSSES">Crosses</option>
+            <option value="SPATIAL_REL_ENVELOPEINTERSECTS">Envelope Intersects</option>
+            <option value="SPATIAL_REL_INDEXINTERSECTS">Index Intersects</option>
+            <option value="SPATIAL_REL_OVERLAPS">Overlaps</option>
+            <option value="SPATIAL_REL_TOUCHES">Touches</option>
+            <option value="SPATIAL_REL_WITHIN">Within</option>
+        </select>
+        <br>
+        <label>Out Fields:</label>
+        <input type="text" id="outFields" value="*" size="75">
+        <br>
+        <label>Max Allowable Offset:</label>
+        <input type="text" id="maxAllowableOffset" value="">
+        <br>
+        <label>Geometry Precision:</label>
+        <input type="text" id="GeometryPrecision" value="">
+        <br>
+        <label>Output Spatial Reference:</label>
+        <input type="text" id="OutSR" value="">
+        <br>
+        <label>Order By Fields:</label>
+        <input type="text" id="OrderByFields" value="">
+        <br>
+        <label>Group By Fields:</label>
+        <input type="text" id="GroupByFields" value="">
+        <br>
+        <label>Return Distinct Values:</label>
+
+        <br>
+
+        <label>查询结果:</label>
+        <br>
+        <div id="result">
+
+        </div>
+    </div>
+    </div>
+</body>
+
+</html>

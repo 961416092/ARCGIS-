@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>WebGIS</title>
+    <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/dijit/themes/tundra/tundra.css" />
+    <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/esri/css/esri.css" />
+    <script type="text/Javascript" src="http://127.0.0.1/arcgis_js_v325_api/init.js"></script>
+    <style type="text/css">
+        .MapClass {
+            width: 100%;
+            height: 800px;
+            border: 1px solid #000;
+        }
+    </style>
+    <script type="text/javascript">
+        require(["esri/map",
+                "esri/geometry/Extent",
+                "dojo/on",
+                "dojo/query",
+                "esri/layers/ArcGISDynamicMapServiceLayer",
+                "esri/toolbars/draw",
+                "esri/toolbars/edit",
+                "esri/layers/FeatureLayer",
+                "esri/layers/GraphicsLayer",
+                'dojo/_base/lang',
+                "esri/graphic",
+                "esri/dijit/editing/Add",
+                "esri/dijit/editing/Delete",
+                "esri/dijit/editing/Update",
+                "esri/tasks/query",
+                "esri/tasks/QueryTask",
+                "dojo/json",
+                "esri/symbols/SimpleFillSymbol",
+                "esri/Color",
+                "dojo/domReady!"
+            ],
+            function (
+                Map,
+                Extent,
+                on,
+                query,
+                ArcGISDynamicMapServiceLayer,
+                Draw,
+                Edit,
+                FeatureLayer,
+                GraphicsLayer,
+                lang,
+                Graphic,
+                Add,
+                Delete,
+                Update,
+                Query,
+                QueryTask,
+                jsonUtil,
+                SimpleFillSymbol,
+                Color) {
+                var map = new Map("MapDiv");
+                var MapServerUrl = "https://localhost:6443/arcgis/rest/services/MyFeatureService/MapServer"
+                var FeatureServerUrl =
+                    "https://localhost:6443/arcgis/rest/services/MyFeatureService/FeatureServer/0";
+                var selectionSymbol = new SimpleFillSymbol().setColor(new Color([255, 255, 0, 0.5]));
+
+                var layer = new ArcGISDynamicMapServiceLayer(MapServerUrl);
+                map.addLayer(layer);
+
+                //用于操作的要素图层
+                var featureLayer = new FeatureLayer(FeatureServerUrl, {
+                    mode: FeatureLayer.MODE_SNAPSHOT,
+                    outFields: ["*"]
+                });
+                featureLayer.setSelectionSymbol(selectionSymbol)
+                map.addLayer(featureLayer);
+
+                //在添加要素时，利用Draw工具获得geometry对象
+                var d = new Draw(map, {
+                    showTooltips: true
+                });
+                //定义一个Edit对象
+                var edit = new Edit(map);
+
+                on(featureLayer, "click", lang.hitch(this, function (evt) {
+                    if (this.isDraw) {
+                        return;
+                    }
+                    this.currentG = evt.graphic;
+                    var query = new Query();
+                    query.where = '1=1'
+                    query.geometry = evt.mapPoint;
+                    // query点击的graphic
+                    featureLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW, lang.hitch(this,
+                        function (results) {
+                            if (results.length > 0) {
+                                console.log("点选了graphics");
+                            }
+                        }));
+                }))
+
+                on(query("button"), "click", lang.hitch(this, function (event) {
+                    var value = event.target.innerHTML;
+                    if (value === "添加要素") {
+                        this.isDraw = true;
+                        d.activate(Draw.POLYGON);
+                    }
+                    if (value === "删除要素") {
+                        if (!this.currentG) {
+                            return
+                        }
+                        var de = new Delete({
+                            "featureLayer": featureLayer,
+                            "deletedGraphics": [this.currentG]
+                        });
+                        //执行删除结果
+                        de.performRedo().then(function () {
+                            console.log('删除成功');
+                            //刷新图层
+                            layer.refresh();
+                        });
+                    }
+                    if (value === "修改要素") {
+                        var options = {
+                            allowAddVertices: true, //能添加结点
+                            allowDeleteVertices: true, //能删除结点
+                        };
+                        if (!this.currentG) {
+                            return
+                        }
+                        //获得旧的要素
+                        var id = this.currentG.attributes.objectid
+                        searchFeather(id, lang.hitch(this, function (result) {
+                            this.oldgraphic = result[0];
+                        }))
+                        edit.activate(Edit.MOVE | Edit.EDIT_VERTICES, this.currentG, options); 
+                    }
+                    if (value === "提交要素") {
+                        edit.deactivate();
+                    }
+                    if (value === "查询要素") {
+                        if (!this.currentG) {
+                            return
+                        }
+                        var id = this.currentG.attributes.objectid
+                        searchFeather(id);
+                    }
+                }));
+
+                //当画图完毕时，添加要素
+                on(d, "draw-complete", lang.hitch(this, function (result) {
+                    var graphic = new Graphic(result.geometry, null, {});
+                    var add = new Add({
+                        "featureLayer": featureLayer, //给哪一个要素图层添加要素
+                        "addedGraphics": [graphic] //用于添加的要素
+                    })
+                    //执行添加函数
+                    add.performRedo().then(lang.hitch(this, function () {
+                        console.log('添加成功');
+                        //刷新视图
+                        layer.refresh();
+                    }));
+                    //关闭绘图对象
+                    d.deactivate();
+                    this.isDraw = false;
+                }));
+
+                on(edit, "deactivate", lang.hitch(this, function (evt) {
+                    this.newgraphic = evt.graphic;
+                    //如果没有id字段会更新失败
+                    this.newgraphic.attributes.id = this.currentG.attributes.objectid
+                    //创建更新对象
+                    var update = new Update({
+                        "featureLayer": featureLayer,
+                        "postUpdatedGraphics": [this.newgraphic], //修改之后的要素
+                        "preUpdatedGraphics": [this.oldgraphic] //修改之前的要素
+                    })
+                    //执行刷新操作
+                    update.performRedo().then(lang.hitch(this, function () {
+                        //刷新视图
+                        layer.refresh();
+                        console.log("修改成功")
+                    }));
+
+                    // featureLayer.applyEdits(null, [this.newgraphic], null,function (e) {
+                    //     layer.refresh();
+                    // },function (e) {
+                    //     console.log(e);
+                    // });
+                }))
+
+                //根据id查询要素
+                function searchFeather(id, callback) {
+                    //定义查询参数
+                    var query = new Query();
+                    query.returnGeometry = false;
+                    // 根据objectIds进行查询
+                    query.objectIds = [id];
+                    query.where = "1=1";
+                    featureLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW, lang.hitch(this, function (result) {
+                        //如果callback不存在，说明仅仅是查询操作
+                        if (!callback) {
+                            var graphic = result[0];
+                            //获得属性
+                            var attributes = graphic.attributes;
+                            var result = jsonUtil.stringify(attributes)
+                            alert(result);
+                        } else //如果callback存在，说明是更新操作
+                        {
+                            callback(result);
+                        }
+                    }));
+                }
+            });
+    </script>
+</head>
+
+<body>
+    <div id="MapDiv" class="MapClass"></div>
+    <button class="btn">添加要素</button>
+    <button class="btn">删除要素</button>
+    <button class="btn">修改要素</button>
+    <button class="btn">提交要素</button>
+    <button class="btn">查询要素</button>
+</body>
+
+</html>
