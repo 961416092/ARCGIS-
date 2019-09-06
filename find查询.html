@@ -129,9 +129,9 @@
             });
 
             var MapServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer"
-            var FeatureServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
+            var findTaskUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
 
-            var findTask = new FindTask(FeatureServerUrl)
+            var findTask = new FindTask(findTaskUrl)
 
             var pointSymbol = new SimpleMarkerSymbol(
                 SimpleMarkerSymbol.STYLE_CIRCLE,
@@ -149,13 +149,13 @@
             var graphicsLayer = new GraphicsLayer();
             map.addLayer(graphicsLayer);
 
-            var ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(FeatureServerUrl);
+            var ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(findTaskUrl);
             ArcGISDynamicMapServiceLayer.visibleLayers = [0]
 
             event();
 
             // 获取图层信息
-            getLayerInfos(FeatureServerUrl).then(function (result) {
+            getLayerInfos(findTaskUrl).then(function (result) {
                 var DOM = $("#selector .select")[0]
                 for (var i = 0; i < result.length; i++) {
                     var item = result[i];

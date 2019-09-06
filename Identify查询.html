@@ -134,12 +134,12 @@
 
             var MapServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer"
             
-            var FeatureServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
+            var identifyTaskUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
 
             // 不同比例尺图层会出现不同图层的显隐  测试layerOption
-            var FeatureServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer";
+            var identifyTaskUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer";
 
-            var identifyTask = new IdentifyTask(FeatureServerUrl)
+            var identifyTask = new IdentifyTask(identifyTaskUrl)
 
             var pointSymbol = new SimpleMarkerSymbol(
                 SimpleMarkerSymbol.STYLE_CIRCLE,
@@ -157,7 +157,7 @@
             var graphicsLayer = new GraphicsLayer();
             map.addLayer(graphicsLayer);
 
-            var ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(FeatureServerUrl);
+            var ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(identifyTaskUrl);
             ArcGISDynamicMapServiceLayer.visibleLayers = [0]
 
             // 绘制工具
@@ -168,7 +168,7 @@
             event();
 
             // 获取图层信息
-            getLayerInfos(FeatureServerUrl).then(function (result) {
+            getLayerInfos(identifyTaskUrl).then(function (result) {
                 var DOM = $("#selector .select")[0]
                 for (var i = 0; i < result.length; i++) {
                     var item = result[i];

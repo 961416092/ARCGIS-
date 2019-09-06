@@ -98,9 +98,9 @@
             });
 
             var MapServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer"
-            var FeatureServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
+            var queryTaskUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
             var layerID = "0"
-            var queryTask = new QueryTask(FeatureServerUrl + layerID)
+            var queryTask = new QueryTask(queryTaskUrl + layerID)
 
             var pointSymbol = new SimpleMarkerSymbol(
                 SimpleMarkerSymbol.STYLE_CIRCLE,
@@ -126,7 +126,7 @@
             event();
 
             // 获取图层信息
-            getLayerInfos(FeatureServerUrl).then(function (result) {
+            getLayerInfos(queryTaskUrl).then(function (result) {
                 var DOM = dom.byId('layers')
                 for (var i = 0; i < result.length; i++) {
                     var item = result[i];
@@ -264,7 +264,7 @@
             function layerChange() {
                 var objS = dom.byId("layers");
                 layerID = objS.options[objS.selectedIndex].value;
-                queryTask = new QueryTask(FeatureServerUrl + layerID);
+                queryTask = new QueryTask(queryTaskUrl + layerID);
             }
         });
     </script>
