@@ -3,7 +3,7 @@
 
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>WebGIS</title>
+    <title>要素服务增删改查</title>
     <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/dijit/themes/tundra/tundra.css" />
     <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/esri/css/esri.css" />
     <script type="text/Javascript" src="http://127.0.0.1/arcgis_js_v325_api/init.js"></script>
@@ -33,7 +33,10 @@
                 "esri/tasks/QueryTask",
                 "dojo/json",
                 "esri/symbols/SimpleFillSymbol",
+                "esri/renderers/SimpleRenderer",
                 "esri/Color",
+                'esri/layers/LayerDataSource',
+                'esri/layers/TableDataSource',
                 "dojo/domReady!"
             ],
             function (
@@ -55,7 +58,10 @@
                 QueryTask,
                 jsonUtil,
                 SimpleFillSymbol,
-                Color) {
+                SimpleRenderer,
+                Color,
+                LayerDataSource,
+                TableDataSource) {
                 var map = new Map("MapDiv");
                 var MapServerUrl = "https://localhost:6443/arcgis/rest/services/MyFeatureService/MapServer"
                 var FeatureServerUrl =
@@ -73,6 +79,9 @@
                 featureLayer.setSelectionSymbol(selectionSymbol)
                 map.addLayer(featureLayer);
 
+                //动态图层
+                var shpLayer = null;
+
                 //在添加要素时，利用Draw工具获得geometry对象
                 var d = new Draw(map, {
                     showTooltips: true
@@ -80,22 +89,71 @@
                 //定义一个Edit对象
                 var edit = new Edit(map);
 
-                on(featureLayer, "click", lang.hitch(this, function (evt) {
-                    if (this.isDraw) {
-                        return;
-                    }
-                    this.currentG = evt.graphic;
-                    var query = new Query();
-                    query.where = '1=1'
-                    query.geometry = evt.mapPoint;
-                    // query点击的graphic
-                    featureLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW, lang.hitch(this,
-                        function (results) {
-                            if (results.length > 0) {
-                                console.log("点选了graphics");
+                bindEvent();
+
+                function bindEvent(params) {
+                    on(featureLayer, "click", lang.hitch(this, function (evt) {
+                            if (this.isDraw) {
+                                return;
                             }
-                        }));
-                }))
+                            this.currentG = evt.graphic;
+                            var query = new Query();
+                            query.where = '1=1'
+                            query.geometry = evt.mapPoint;
+                            // query点击的graphic
+                            featureLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW, lang.hitch(this,
+                                function (results) {
+                                    if (results.length > 0) {
+                                        if (shpLayer) {
+                                            shpLayer.clearSelection();
+                                        }
+                                        console.log("点选了graphics");
+                                    }
+                                }));
+                        })),
+
+                        //当画图完毕时，添加要素
+                        on(d, "draw-complete", lang.hitch(this, function (result) {
+                            var graphic = new Graphic(result.geometry, null, {});
+                            var add = new Add({
+                                "featureLayer": featureLayer, //给哪一个要素图层添加要素
+                                "addedGraphics": [graphic] //用于添加的要素
+                            })
+                            //执行添加函数
+                            add.performRedo().then(lang.hitch(this, function () {
+                                console.log('添加成功');
+                                //刷新视图
+                                layer.refresh();
+                            }));
+                            //关闭绘图对象
+                            d.deactivate();
+                            this.isDraw = false;
+                        })),
+
+                        on(edit, "deactivate", lang.hitch(this, function (evt) {
+                            this.newgraphic = evt.graphic;
+                            //如果没有id字段会更新失败
+                            this.newgraphic.attributes.id = this.currentG.attributes.objectid
+                            //创建更新对象
+                            var update = new Update({
+                                "featureLayer": featureLayer,
+                                "postUpdatedGraphics": [this.newgraphic], //修改之后的要素
+                                "preUpdatedGraphics": [this.oldgraphic] //修改之前的要素
+                            })
+                            //执行刷新操作
+                            update.performRedo().then(lang.hitch(this, function () {
+                                //刷新视图
+                                layer.refresh();
+                                console.log("修改成功")
+                            }));
+
+                            // featureLayer.applyEdits(null, [this.newgraphic], null,function (e) {
+                            //     layer.refresh();
+                            // },function (e) {
+                            //     console.log(e);
+                            // });
+                        }))
+                }
 
                 on(query("button"), "click", lang.hitch(this, function (event) {
                     var value = event.target.innerHTML;
@@ -131,7 +189,7 @@
                         searchFeather(id, lang.hitch(this, function (result) {
                             this.oldgraphic = result[0];
                         }))
-                        edit.activate(Edit.MOVE | Edit.EDIT_VERTICES, this.currentG, options); 
+                        edit.activate(Edit.MOVE | Edit.EDIT_VERTICES, this.currentG, options);
                     }
                     if (value === "提交要素") {
                         edit.deactivate();
@@ -143,49 +201,55 @@
                         var id = this.currentG.attributes.objectid
                         searchFeather(id);
                     }
+                    if (value === "添加SHP") {
+                        var fileName = 'range复制.shp';
+                        var workspaceID = 'MyShapefileWorkspaceID'
+                        var shpTableDataSource = new TableDataSource();
+                        shpTableDataSource.workspaceId = workspaceID;
+                        shpTableDataSource.dataSourceName = fileName;
+
+                        var shpLayerDataSource = new LayerDataSource();
+                        shpLayerDataSource.dataSource = shpTableDataSource;
+
+                        _createSHPDynamicLayer(shpLayerDataSource, fileName);
+                    }
                 }));
 
-                //当画图完毕时，添加要素
-                on(d, "draw-complete", lang.hitch(this, function (result) {
-                    var graphic = new Graphic(result.geometry, null, {});
-                    var add = new Add({
-                        "featureLayer": featureLayer, //给哪一个要素图层添加要素
-                        "addedGraphics": [graphic] //用于添加的要素
-                    })
-                    //执行添加函数
-                    add.performRedo().then(lang.hitch(this, function () {
-                        console.log('添加成功');
-                        //刷新视图
-                        layer.refresh();
-                    }));
-                    //关闭绘图对象
-                    d.deactivate();
-                    this.isDraw = false;
-                }));
+                function _createSHPDynamicLayer(datasource, fileName) {
+                    var layerId = 'SHPDynamicLayer_' + fileName;
+                    var layerUrl = 'https://localhost:6443/arcgis/rest/services/TEST/river/MapServer/dynamicLayer';
+                    shpLayer = new FeatureLayer(layerUrl, {
+                        // mode: FeatureLayer.MODE_ONDEMOND,
+                        source: datasource,
+                        id: layerId
+                    });
+                    shpLayer.setSelectionSymbol(selectionSymbol)
 
-                on(edit, "deactivate", lang.hitch(this, function (evt) {
-                    this.newgraphic = evt.graphic;
-                    //如果没有id字段会更新失败
-                    this.newgraphic.attributes.id = this.currentG.attributes.objectid
-                    //创建更新对象
-                    var update = new Update({
-                        "featureLayer": featureLayer,
-                        "postUpdatedGraphics": [this.newgraphic], //修改之后的要素
-                        "preUpdatedGraphics": [this.oldgraphic] //修改之前的要素
-                    })
-                    //执行刷新操作
-                    update.performRedo().then(lang.hitch(this, function () {
-                        //刷新视图
-                        layer.refresh();
-                        console.log("修改成功")
-                    }));
+                    on(shpLayer, "click", lang.hitch(this, function (evt) {
+                        if (this.isDraw) {
+                            return;
+                        }
+                        this.currentG = evt.graphic;
+                        var query = new Query();
+                        query.where = '1=1'
+                        query.geometry = evt.mapPoint;
+                        // query点击的graphic
+                        shpLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW, lang.hitch(this,
+                            function (results) {
+                                if (results.length > 0) {
+                                    featureLayer.clearSelection()
+                                    console.log("点选了graphics");
+                                }
+                            }));
+                    }))
 
-                    // featureLayer.applyEdits(null, [this.newgraphic], null,function (e) {
-                    //     layer.refresh();
-                    // },function (e) {
-                    //     console.log(e);
-                    // });
-                }))
+                    var symbol = new SimpleFillSymbol().setColor(new Color([255, 0, 0, 0.5]));
+                    var renderer = new SimpleRenderer(symbol);
+                    shpLayer.setRenderer(renderer);
+                    shpLayer.refresh();
+
+                    map.addLayer(shpLayer);
+                };
 
                 //根据id查询要素
                 function searchFeather(id, callback) {
@@ -195,7 +259,8 @@
                     // 根据objectIds进行查询
                     query.objectIds = [id];
                     query.where = "1=1";
-                    featureLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW, lang.hitch(this, function (result) {
+                    featureLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW, lang.hitch(this, function (
+                        result) {
                         //如果callback不存在，说明仅仅是查询操作
                         if (!callback) {
                             var graphic = result[0];
@@ -220,6 +285,7 @@
     <button class="btn">修改要素</button>
     <button class="btn">提交要素</button>
     <button class="btn">查询要素</button>
+    <button class="btn">添加SHP</button>
 </body>
 
 </html>

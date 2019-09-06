@@ -1,272 +1,222 @@
 <!DOCTYPE html>
-<html>
+<html xmlns="http://www.w3.org/1999/xhtml">
 
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no" />
-    <title>Generate classed color breaks renderer</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>要素图层渲染</title>
     <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/dijit/themes/tundra/tundra.css" />
     <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/esri/css/esri.css" />
-    <style>
-        html,
-        body {
-            height: 100%;
+    <script type="text/Javascript" src="http://127.0.0.1/arcgis_js_v325_api/init.js"></script>
+    <style type="text/css">
+        .MapClass {
             width: 100%;
-            margin: 0;
-            padding: 0;
+            height: 800px;
+            border: 1px solid #000;
         }
 
-        #map {
-            margin: 0;
-            padding: 0;
-        }
-
-        #feedback {
+        #info {
             position: absolute;
-            height: 410px;
-            font-family: arial;
-            margin: 5px;
+            right: 6px;
+            top: 8px;
             padding: 10px;
-            z-index: 40;
-            background: #fff;
-            color: #444;
-            width: 300px;
-            left: 30px;
-            top: 30px;
-            box-shadow: 0 0 5px #888;
-        }
-
-        #legendWrapper {
-            padding: 20px 0 0 0;
-        }
-
-        #note {
-            font-size: 80%;
-            font-weight: 700;
-            padding: 0 0 10px 0;
-        }
-
-        h3 {
-            margin: 0 0 5px 0;
-            border-bottom: 1px solid #444;
+            background-color: #999;
+            font: 14px Segoe UI;
+            width: 200px;
+            text-align: center;
+            border-radius: 0 0 0 10px;
         }
     </style>
-
-    <script type="text/Javascript" src="http://127.0.0.1/arcgis_js_v325_api/init.js"></script>
-    <script>
-        //global vars
-        var layer, legend;
-
-        require([
-
-            "esri/map",
-            "esri/dijit/PopupTemplate",
-            "esri/layers/FeatureLayer",
-            "esri/dijit/Legend",
-            "esri/renderers/smartMapping",
-
-            "dojo/_base/array",
-            "dojo/dom",
-            "dojo/dom-construct",
-            "dojo/data/ItemFileReadStore",
-            "dijit/form/FilteringSelect",
-            "dojo/parser",
-
-            "dijit/layout/BorderContainer",
-            "dijit/layout/ContentPane",
-
-            "dojo/domReady!"
-
-        ], function (
-            Map,
-            PopupTemplate,
-            FeatureLayer,
-            Legend,
-            smartMapping,
-
-            array,
-            dom,
-            domConstruct,
-            ItemFileReadStore,
-            FilteringSelect,
-            parser
-
-        ) {
-            var mapOptions = {
-                basemap: "terrain",
-                center: [-123.113, 47.035],
-                zoom: 7,
-                slider: false
-            };
-
-            var map = new Map("map", mapOptions);
-            var fieldName = "POP2007";
-
-            // the counties map service uses the actual field name as the field alias
-            // set up an object to use as a lookup table to work with user friendly field names
-
-            var fields = {
-                "POP2007": "Population(2007)",
-                "POP07_SQMI": "Population/Square Mile(2007)",
-                "WHITE": "White",
-                "BLACK": "Black",
-                "AMERI_ES": "Native Americans",
-                "HISPANIC": "Hispanic",
-                "ASIAN": "Asian",
-                "HAWN_PI": "Native Hawaiian/Pacific Islander",
-                "MULT_RACE": "Multiple Races",
-                "OTHER": "Other"
-            };
-            var outFields = ["POP2007", "POP07_SQMI", "WHITE", "BLACK", "AMERI_ES", "ASIAN", "HAWN_PI", "OTHER",
-                "MULT_RACE", "HISPANIC", "STATE_NAME", "NAME"
-            ];
-
-            //create popup
-            var popupTemplate = new PopupTemplate({
-                title: "{NAME} County",
-                fieldInfos: [{
-                    "fieldName": fieldName,
-                    "label": fields[fieldName],
-                    "visible": true,
-                    "format": {
-                        places: 0,
-                        digitSeparator: true
-                    }
-                }],
-                showAttachments: true
-            });
-
-            layer = new FeatureLayer(
-            "//sampleserver6.arcgisonline.com/arcgis/rest/services/Census/MapServer/2", {
-                "id": "Washington",
-                "infoTemplate": popupTemplate,
-                "mode": FeatureLayer.MODE_SNAPSHOT,
-                "outFields": outFields,
-                "opacity": 0.8
-            });
-
-            //only working with Washington state
-            layer.setDefinitionExpression("STATE_NAME='Washington'");
-            map.addLayer(layer);
-
-            layer.on("load", function () {
-                createRenderer(fieldName);
-            });
-
-            function createRenderer(field) {
-                //smart mapping functionality begins
-                smartMapping.createClassedColorRenderer({
-                    layer: layer,
-                    field: field,
-                    basemap: map.getBasemap(),
-                    classificationMethod: "quantile"
-                }).then(function (response) {
-                    layer.setRenderer(response.renderer);
-                    layer.redraw();
-                    createLegend(map, layer, field);
-                });
-            }
-
-            //this function gets called when fields are selected to render
-            function updateAttribute(ch) {
-                map.infoWindow.hide();
-
-                var popupTemplateUpdated = new PopupTemplate({
-                    title: "{NAME} County",
-                    fieldInfos: [{
-                        "fieldName": ch,
-                        "label": fields[ch],
-                        "visible": true,
-                        "format": {
-                            places: 0,
-                            digitSeparator: true
+    <script type="text/javascript">
+        require(["esri/map",
+                "esri/geometry/Extent",
+                "dojo/on",
+                "dojo/query",
+                "esri/layers/ArcGISDynamicMapServiceLayer",
+                "esri/layers/FeatureLayer",
+                "esri/renderers/ClassBreaksRenderer",
+                "esri/renderers/UniqueValueRenderer",
+                "esri/renderers/HeatmapRenderer",
+                "esri/renderers/ScaleDependentRenderer",
+                "esri/layers/LayerDrawingOptions",
+                "esri/InfoTemplate",
+                "esri/dijit/Legend",
+                'dojo/_base/lang',
+                'dojo/dom-construct',
+                "dojo/json",
+                "esri/symbols/SimpleFillSymbol",
+                "esri/symbols/SimpleLineSymbol",
+                "esri/renderers/SimpleRenderer",
+                "esri/Color",
+                "dojo/domReady!"
+            ],
+            function (
+                Map,
+                Extent,
+                on,
+                query,
+                ArcGISDynamicMapServiceLayer,
+                FeatureLayer,
+                ClassBreaksRenderer,
+                UniqueValueRenderer,
+                HeatmapRenderer,
+                ScaleDependentRenderer,
+                LayerDrawingOptions,
+                InfoTemplate,
+                Legend,
+                lang,
+                domcon,
+                jsonUtil,
+                SimpleFillSymbol,
+                SimpleLineSymbol,
+                SimpleRenderer,
+                Color) {
+                var map = new Map("mapDiv", {
+                    extent: new Extent({
+                        xmin: 606791,
+                        ymin: 2703045,
+                        xmax: 621164,
+                        ymax: 2717376,
+                        spatialReference: {
+                            wkid: 4548
                         }
-                    }],
-                    showAttachments: true
+                    })
                 });
-                layer.setInfoTemplate(popupTemplateUpdated);
-                createRenderer(ch);
-                layer.redraw();
-                createLegend(map, layer, ch);
-            }
 
-            //Create a legend
-            function createLegend(map, layer, field) {
-                //If applicable, destroy previous legend
-                if (legend) {
-                    legend.destroy();
-                    domConstruct.destroy(dom.byId("legendDiv"));
+                var MapServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer"
+                var FeatureServerUrl_ClassBreaks =
+                    "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/53";
+                var FeatureServerUrl_UniqueValue =
+                    "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/52";
+                var FeatureServerUrl_Heatmap =
+                    "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/50";
+                var ArcGISDynamicMapServiceLayer_ClassBreaks =
+                    "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer";
+
+                // 底图
+                var layer = new ArcGISDynamicMapServiceLayer(MapServerUrl);
+                map.addLayer(layer);
+
+                // 渲染图层
+                var featureLayer = null;
+                // 图例组件
+                var legend = null;
+
+                var infoTemplate = new InfoTemplate("${NAME}", "${*}");
+
+                _createClassBreaksRenderer();
+
+                function _createClassBreaksRenderer() {
+                    featureLayer = new FeatureLayer(
+                        FeatureServerUrl_ClassBreaks, {
+                            mode: FeatureLayer.MODE_SNAPSHOT,
+                            outFields: ["*"],
+                            infoTemplate: infoTemplate
+                        });
+                    var renderer = new ClassBreaksRenderer(null, "SHAPE.AREA");
+                    var color1 = new Color([247, 252, 185]); // yellow
+                    var color2 = new Color([173, 221, 142]); // light green
+                    var color3 = new Color([49, 163, 84]); // green
+
+                    var colors = [color1, color2, color3];
+                    var values = ["Infinity", 114000000, 22000000, 0]
+
+                    for (var i = 0; i < colors.length; i++) {
+                        var color = colors[i];
+                        renderer.addBreak({
+                            minValue: values[i + 1],
+                            maxValue: values[i],
+                            label: values[i + 1] + "<" + values[i],
+                            symbol: new SimpleFillSymbol(
+                                "solid",
+                                new SimpleLineSymbol("solid", new Color([0, 0, 0]), 2),
+                                color
+                            )
+                        });
+                    }
+                    featureLayer.setRenderer(renderer);
+                    featureLayer.on("load", createLegend);
+                    map.addLayer(featureLayer);
                 }
 
-                // create a new div for the legend
-                var legendDiv = domConstruct.create("div", {
-                    id: "legendDiv"
-                }, dom.byId("legendWrapper"));
+                function _createUniqueValueRenderer() {
+                    featureLayer = new FeatureLayer(
+                        FeatureServerUrl_UniqueValue, {
+                            mode: FeatureLayer.MODE_SNAPSHOT,
+                            outFields: ["*"],
+                            infoTemplate: infoTemplate
+                        });
+                    var renderer = new UniqueValueRenderer(null, "NAME");
 
-                legend = new Legend({
-                    map: map,
-                    layerInfos: [{
-                        layer: layer,
-                        title: "Census Attribute: " + field
-                    }]
-                }, legendDiv);
-                legend.startup();
-            }
+                    //add symbol for each possible value
+                    renderer.addValue("同安区", new SimpleFillSymbol().setColor(new Color([255, 0, 0, 0.5])));
+                    renderer.addValue("集美区", new SimpleFillSymbol().setColor(new Color([0, 255, 0, 0.5])));
+                    renderer.addValue("海沧区", new SimpleFillSymbol().setColor(new Color([0, 0, 255, 0.5])));
+                    renderer.addValue("湖里区", new SimpleFillSymbol().setColor(new Color([255, 0, 255, 0.5])));
+                    renderer.addValue("思明区", new SimpleFillSymbol().setColor(new Color([255, 255, 255, 0.75])));
+                    renderer.addValue("翔安区", new SimpleFillSymbol().setColor(new Color([0, 255, 255, 0.5])));
+                    featureLayer.setRenderer(renderer);
+                    featureLayer.on("load", createLegend);
+                    map.addLayer(featureLayer);
+                }
 
-            // create a store and a filtering select for the county layer's fields
-            var fieldNames, fieldStore, fieldSelect;
-            fieldNames = {
-                "identifier": "value",
-                "label": "name",
-                "items": []
-            };
-            array.forEach(outFields, function (f) {
-                if (array.indexOf(f.split("_"), "NAME") == -1) { // exclude attrs that contain "NAME"
-                    fieldNames.items.push({
-                        "name": fields[f],
-                        "value": f
-                    });
+                function _createHeatmapRenderer() {
+                    featureLayer = new FeatureLayer(
+                        FeatureServerUrl_Heatmap, {
+                            mode: FeatureLayer.MODE_SNAPSHOT,
+                            outFields: ["*"],
+                            infoTemplate: infoTemplate
+                        });
+                    featureLayer.setDefinitionExpression("OBJECTID < 5000")
+
+                    var renderer = new HeatmapRenderer();
+
+                    featureLayer.setRenderer(renderer);
+                    featureLayer.on("load", createLegend);
+                    map.addLayer(featureLayer);
+                }
+
+                on(query("button"), "click", lang.hitch(this, function (event) {
+                    var value = event.target.innerHTML;
+                    map.removeLayer(featureLayer);
+                    legend.destroy()
+                    if (value === "分级渲染") {
+                        _createClassBreaksRenderer();
+                    }
+                    if (value === "唯一值渲染") {
+                        _createUniqueValueRenderer();
+                    }
+                    if (value === "热力图") {
+                        _createHeatmapRenderer();
+                    }
+                }));
+
+
+                function createLegend(results) {
+                    domcon.create('div', {
+                        id: "legend"
+                    }, query("#info")[0])
+                    legend = new Legend({
+                        layerInfos: [{
+                            layer: results.layer,
+                            title: " "
+                        }],
+                        map: map
+                    }, "legend");
+                    legend.startup();
                 }
             });
-
-            fieldStore = new ItemFileReadStore({
-                data: fieldNames
-            });
-            fieldSelect = new FilteringSelect({
-                displayedValue: fieldNames.items[0].name,
-                value: fieldNames.items[0].value,
-                name: "fieldsFS",
-                required: false,
-                store: fieldStore,
-                searchAttr: "name",
-                style: {
-                    "width": "290px",
-                    "fontSize": "12pt",
-                    "color": "#444"
-                }
-            }, domConstruct.create("div", null, dom.byId("fieldWrapper")));
-            fieldSelect.on("change", updateAttribute);
-
-        });
     </script>
 </head>
 
-<body class="tundra">
-    <div data-dojo-type="dijit.layout.BorderContainer" data-dojo-props="design:'headline',gutters:false"
-        style="width: 100%; height: 100%; margin: 0;">
-        <div id="map" data-dojo-type="dijit.layout.ContentPane" data-dojo-props="region:'center'">
-            <div id="feedback">
-                <h3>Washington State</h3>
-                <div id="info">
-                    Select a field to use to create a renderer for the counties in Washington state.
-                </div>
-                <div id="legendWrapper"></div>
-                <div id="fieldWrapper">
-                    Currently selected attribute:
-                </div>
-            </div>
-        </div>
+<body>
+    <div id="mapDiv" class="MapClass"></div>
+    <div id="info">
+        <div style="font-size: 20px;">渲染图例</div>
+        <div id="legend"></div>
     </div>
+    <button class="btn">分级渲染</button>
+    <button class="btn">唯一值渲染</button>
+    <button class="btn">热力图</button>
 </body>
 
 </html>

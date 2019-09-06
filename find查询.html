@@ -6,6 +6,7 @@
     <title>FindTask</title>
     <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/dijit/themes/tundra/tundra.css" />
     <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/esri/css/esri.css" />
+    <script src="https://code.jquery.com/jquery-3.0.0.min.js"></script>
     <script type="text/Javascript" src="http://127.0.0.1/arcgis_js_v325_api/init.js"></script>
     <style>
         html,
@@ -29,6 +30,36 @@
             width: 39%;
             height: 99%;
             border: 1px solid #000;
+        }
+
+        #selector {
+            position: absolute;
+            top: 10px;
+            right: 40%;
+            background: wheat;
+        }
+
+        #selector .mr-selector {
+            display: block;
+            height: 30px;
+            width: 400px;
+            border: 1px solid black;
+        }
+
+        #selector .select {
+            display: none;
+            width: 400px;
+            margin-top: -1px;
+            border: 1px solid black;
+            padding: 0;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+
+        #selector .select li {
+            padding-left: 10px;
+            list-style: none;
+            background: white;
         }
     </style>
     <script>
@@ -119,21 +150,73 @@
             map.addLayer(graphicsLayer);
 
             var ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(FeatureServerUrl);
-            ArcGISDynamicMapServiceLayer.visibleLayers=[0]
+            ArcGISDynamicMapServiceLayer.visibleLayers = [0]
 
             event();
 
+            // 获取图层信息
+            getLayerInfos(FeatureServerUrl).then(function (result) {
+                var DOM = $("#selector .select")[0]
+                for (var i = 0; i < result.length; i++) {
+                    var item = result[i];
+                    domCon.create('li', {
+                        value: item.id,
+                        innerHTML: '<input type="checkbox" value=' + item.id + '>' + item.id +
+                            ":" + item.name
+                    }, DOM)
+                }
+            })
+
             function event() {
                 on(dom.byId('Query'), 'click', lang.hitch(this, _doQuery))
+                var selector = $("#selector");
+                var select = $("#selector .select"); //模拟select的ul选项
+                var mrSelector = $("#selector .mr-selector");
+
+                selector.click(function (eve) {
+                    eve.stopPropagation(); //阻止冒泡避免点击后消失    
+                });
+                var mrSelector = $("#selector .mr-selector");
+                mrSelector.click(function () {
+                    select.toggle();
+                });
+                $("body").click(function () {
+                    select.hide();
+                });
+            }
+
+            function getLayerInfos(url) {
+                var deferred = new Deferred();
+                esriRequest({
+                    url: url,
+                    content: {
+                        f: 'json'
+                    },
+                    handleAs: 'json',
+                    callbackParamName: 'callback'
+                }).then(lang.hitch(this, function (result) {
+                    deferred.resolve(result.layers);
+                }), function (err) {
+                    console.error(err.message || err);
+                    deferred.resolve(null);
+                });
+                return deferred;
             }
 
             function _doQuery() {
                 //定义查询参数
                 var findParameters = new FindParameters();
-                
+
                 dom.byId('result').innerHTML = 'loading';
 
-                findParameters.layerIds = dom.byId('Layers').value.split(",");
+                findParameters.layerIds = [];
+                var li = $("#selector .select li input"); //li选项
+                for (var i = 0; i < li.length; i++) {
+                    var item = li[i];
+                    if (item.checked) {
+                        findParameters.layerIds.push(item.value)
+                    }
+                }
                 var LayerDefinitions = dom.byId('LayerDefinitions').value.split(",");
                 findParameters.layerDefinitions = [];
                 if (LayerDefinitions[0] !== "") {
@@ -143,13 +226,22 @@
                         findParameters.layerDefinitions[item[0]] = item[1];
                     }
                 }
-
-                findParameters.searchFields = dom.byId('searchFields').value.split(",");;
+                
                 findParameters.searchText = dom.byId('searchText').value;
+                var radios = document.getElementsByName('Contains');
+                for (var i = 0; i < radios.length; i++) {
+                    if (radios[i].checked) {
+                        findParameters.contains = radios[i].value === 'true';
+                        break;
+                    }
+                }
+                findParameters.searchFields = dom.byId('searchFields').value.split(",");
+                findParameters.outSpatialReference = new SpatialReference({
+                    wkid: dom.byId('SR').value
+                });
                 findParameters.maxAllowableOffset = dom.byId('maxAllowableOffset').value;
                 findParameters.geometryPrecision = dom.byId('GeometryPrecision').value;
 
-                findParameters.contains = true;
                 findParameters.returnGeometry = true;
 
                 findTask.execute(findParameters, function (e) {
@@ -158,7 +250,7 @@
                     var symbol = null;
 
                     domCon.create('label', {
-                        innerHTML: "数量："+e.length
+                        innerHTML: "数量：" + e.length
                     }, dom.byId('result'));
                     domCon.create('br', {}, dom.byId('result'));
                     for (var i = 0; i < e.length; i++) {
@@ -183,6 +275,8 @@
                         domCon.create('br', {}, dom.byId('result'));
                         domCon.create('br', {}, dom.byId('result'));
                     }
+                },function (error) {
+                    dom.byId('result').innerHTML = error
                 })
             }
         });
@@ -192,32 +286,41 @@
 <body>
     <div id="mapDiv" class="MapClass"></div>
     <div id="panel" class="panelClass" style="font-size: 20px; overflow-y:scroll;WORD-WRAP:break-word">
-        <button id="Query">查询</button>
-
+        <label>searchText:</label>
+        <input type="text" id="searchText" value="" placeholder="">
         <br>
-        <label>Layers:</label>
-        <input type="text" id="Layers" value="50" size="75">
-        <br>
-        <label>Layer Definitions:</label>
-        <input type="text" id="LayerDefinitions" value="50:QDM='思明区'" size="60">
+        <label>Contains:</label>
+        <input type="radio" name="Contains" value=true>
+        <label for="Contains">是</label>
+        <input type="radio" name="Contains" value=false checked>
+        <label for="Contains">否</label>
         <br>
         <label>searchFields:</label>
-        <input type="text" id="searchFields" value="学区名称">
+        <input type="text" id="searchFields" value="" placeholder="">
         <br>
-        <label>searchText:</label>
-        <input type="text" id="searchText" value="五缘第二实验学校（小学）">
+        <label>Spatial Reference:</label>
+        <input type="text" id="SR" value="" placeholder="">
+        <br>
+        <label>Layer Definitions:</label>
+        <input type="text" id="LayerDefinitions" value="" placeholder="" size="60">
         <br>
         <label>Max Allowable Offset:</label>
-        <input type="text" id="maxAllowableOffset" value="">
+        <input type="text" id="maxAllowableOffset" value="" placeholder="">
         <br>
         <label>Geometry Precision:</label>
-        <input type="text" id="GeometryPrecision" value="">
+        <input type="text" id="GeometryPrecision" value="" placeholder="">
+        <br>
+        <button id="Query">查询</button>
         <br>
         <label>查询结果:</label>
         <br>
         <div id="result">
         </div>
     </div>
+    <div id="selector">
+        <span class="mr-selector" style="text-align: center">图层组</span>
+        <ul class="select">
+        </ul>
     </div>
 </body>
 

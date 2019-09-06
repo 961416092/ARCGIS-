@@ -151,6 +151,8 @@
             }
 
             function _doQuery() {
+                graphicsLayer.clear();
+
                 dom.byId('result').innerHTML = 'loading';
 
                 //定义查询参数
@@ -165,22 +167,40 @@
                     .selectedIndex].value];
                 query.maxAllowableOffset = dom.byId('maxAllowableOffset').value;
                 query.geometryPrecision = dom.byId('GeometryPrecision').value;
-                query.outSpatialReference = new SpatialReference({
-                    wkid: dom.byId('OutSR').value
-                });
+                if (dom.byId('OutSR').value !== '') {
+                    query.outSpatialReference = new SpatialReference({
+                        wkid: dom.byId('OutSR').value
+                    });
+                }
                 query.orderByFields = dom.byId('OrderByFields').value.split(",");
                 query.groupByFieldsForStatistics = dom.byId('GroupByFields').value.split(",");
 
+                var radios = document.getElementsByName('returnDistinctValues');
+                for (var i = 0; i < radios.length; i++) {
+                    if (radios[i].checked) {
+                        query.returnDistinctValues = radios[i].value === 'true';
+                        break;
+                    }
+                }
+
+                var radios = document.getElementsByName('returnGeometry');
+                for (var i = 0; i < radios.length; i++) {
+                    if (radios[i].checked) {
+                        query.returnGeometry = radios[i].value === 'true';
+                        break;
+                    }
+                }
 
                 // var statisticDefinition = new StatisticDefinition();
                 // statisticDefinition.statisticType = "count";
                 // statisticDefinition.onStatisticField = "年龄";
                 // statisticDefinition.outStatisticFieldName = "数量";
                 // query.outStatistics = [statisticDefinition];
-                query.returnGeometry = true;
+
 
                 queryTask.execute(query, function (e) {
-                    graphicsLayer.clear();
+                    console.log(e);
+
                     dom.byId('result').innerHTML = ''
                     var symbol = null;
                     switch (e.geometryType) {
@@ -209,6 +229,8 @@
                         domCon.create('br', {}, dom.byId('result'));
                         domCon.create('br', {}, dom.byId('result'));
                     }
+                }, function (error) {
+                    dom.byId('result').innerHTML = error
                 })
             }
 
@@ -251,21 +273,18 @@
 <body>
     <div id="mapDiv" class="MapClass"></div>
     <div id="panel" class="panelClass" style="font-size: 20px; overflow-y:scroll;WORD-WRAP:break-word">
-        <button id="Query">查询</button>
         <button id="Draw">绘制区域</button>
         <button id="clearDraw">清除区域</button>
+        <br>
         <label>图层选择:</label>
         <select id="layers">
         </select>
         <br>
         <label>Where:</label>
-        <input type="text" id="where" value="OBJECTID < 100" size="75">
+        <input type="text" id="where" size="75" value="OBJECTID < 1000">
         <br>
         <label>Object IDs:</label>
         <input type="text" id="objectIds" value="" size="60">
-        <br>
-        <label>Input Spatial Reference:</label>
-        <input type="text" id="inSR" value="" size="60"></>
         <br>
         <label>Spatial Relationship:</label>
         <select id="spatialRel">
@@ -281,6 +300,12 @@
         <br>
         <label>Out Fields:</label>
         <input type="text" id="outFields" value="*" size="75">
+        <br>
+        <label>Return Geometry:</label>
+        <input type="radio" name="returnGeometry" value=true checked>
+        <label for="returnGeometry">是</label>
+        <input type="radio" name="returnGeometry" value=false>
+        <label for="returnGeometry">否</label>
         <br>
         <label>Max Allowable Offset:</label>
         <input type="text" id="maxAllowableOffset" value="">
@@ -298,9 +323,14 @@
         <input type="text" id="GroupByFields" value="">
         <br>
         <label>Return Distinct Values:</label>
-
+        <input type="radio" name="returnDistinctValues" value="true">
+        <label for="returnDistinctValues">是</label>
+        <input type="radio" name="returnDistinctValues" value="false" checked>
+        <label for="returnDistinctValues">否</label>
         <br>
-
+        <button id="Query">查询</button>
+        <br>
+        <br>
         <label>查询结果:</label>
         <br>
         <div id="result">

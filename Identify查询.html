@@ -6,6 +6,7 @@
     <title>IdentifyTask</title>
     <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/dijit/themes/tundra/tundra.css" />
     <link rel="stylesheet" type="text/css" href="http://127.0.0.1/arcgis_js_v325_api/esri/css/esri.css" />
+    <script src="https://code.jquery.com/jquery-3.0.0.min.js"></script>
     <script type="text/Javascript" src="http://127.0.0.1/arcgis_js_v325_api/init.js"></script>
     <style>
         html,
@@ -29,6 +30,36 @@
             width: 39%;
             height: 99%;
             border: 1px solid #000;
+        }
+
+        #selector {
+            position: absolute;
+            top: 10px;
+            right: 40%;
+            background: wheat;
+        }
+
+        #selector .mr-selector {
+            display: block;
+            height: 30px;
+            width: 400px;
+            border: 1px solid black;
+        }
+
+        #selector .select {
+            display: none;
+            width: 400px;
+            margin-top: -1px;
+            border: 1px solid black;
+            padding: 0;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+
+        #selector .select li {
+            padding-left: 10px;
+            list-style: none;
+            background: white;
         }
     </style>
     <script>
@@ -102,7 +133,11 @@
             });
 
             var MapServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer"
+            
             var FeatureServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/";
+
+            // 不同比例尺图层会出现不同图层的显隐  测试layerOption
+            var FeatureServerUrl = "http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer";
 
             var identifyTask = new IdentifyTask(FeatureServerUrl)
 
@@ -123,7 +158,7 @@
             map.addLayer(graphicsLayer);
 
             var ArcGISDynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(FeatureServerUrl);
-            ArcGISDynamicMapServiceLayer.visibleLayers=[0]
+            ArcGISDynamicMapServiceLayer.visibleLayers = [0]
 
             // 绘制工具
             var d = new Draw(map, {
@@ -131,6 +166,18 @@
             });
 
             event();
+
+            // 获取图层信息
+            getLayerInfos(FeatureServerUrl).then(function (result) {
+                var DOM = $("#selector .select")[0]
+                for (var i = 0; i < result.length; i++) {
+                    var item = result[i];
+                    domCon.create('li', {
+                        value: item.id,
+                        innerHTML: '<input type="checkbox" value=' + item.id + '>' + item.id + ":" + item.name
+                    }, DOM)
+                }
+            })
 
             function event() {
                 on(dom.byId('Query'), 'click', lang.hitch(this, _doQuery))
@@ -142,9 +189,45 @@
                     map.graphics.add(this.graphic);
                     d.deactivate();
                 }));
+
+                var selector = $("#selector");
+                var select = $("#selector .select"); //模拟select的ul选项
+                var mrSelector = $("#selector .mr-selector");
+
+                selector.click(function (eve) {
+                    eve.stopPropagation(); //阻止冒泡避免点击后消失    
+                });
+                var mrSelector = $("#selector .mr-selector");
+                mrSelector.click(function () {
+                    select.toggle();
+                });
+                $("body").click(function () {
+                    select.hide();
+                });
+            }
+
+            function getLayerInfos(url) {
+                var deferred = new Deferred();
+                esriRequest({
+                    url: url,
+                    content: {
+                        f: 'json'
+                    },
+                    handleAs: 'json',
+                    callbackParamName: 'callback'
+                }).then(lang.hitch(this, function (result) {
+                    deferred.resolve(result.layers);
+                }), function (err) {
+                    console.error(err.message || err);
+                    deferred.resolve(null);
+                });
+                return deferred;
             }
 
             function _doQuery() {
+                graphicsLayer.clear();
+                dom.byId('result').innerHTML = '';
+
                 //定义查询参数
                 var identifyParams = new IdentifyParameters();
                 if (this.graphic) {
@@ -155,7 +238,15 @@
                 }
                 dom.byId('result').innerHTML = 'loading';
 
-                identifyParams.layerIds = dom.byId('Layers').value.split(",");
+                identifyParams.layerIds = [];
+                var li = $("#selector .select li input"); //li选项
+                for (var i = 0; i < li.length; i++) {
+                    var item = li[i];
+                    if (item.checked) {
+                        identifyParams.layerIds.push(item.value)
+                    }
+                }
+
                 var LayerDefinitions = dom.byId('LayerDefinitions').value.split(",");
                 identifyParams.layerDefinitions = [];
                 if (LayerDefinitions[0] !== "") {
@@ -166,7 +257,8 @@
                     }
                 }
                 identifyParams.tolerance = dom.byId('tolerance').value;
-                identifyParams.layerOption = IdentifyParameters[dom.byId('layerOption').options[dom.byId('layerOption').selectedIndex].value];
+                identifyParams.layerOption = IdentifyParameters[dom.byId('layerOption').options[dom.byId(
+                    'layerOption').selectedIndex].value];
 
                 if (this.graphic) {
                     identifyParams.geometry = this.graphic.geometry;
@@ -178,12 +270,11 @@
                 identifyParams.returnGeometry = true;
 
                 identifyTask.execute(identifyParams, function (e) {
-                    graphicsLayer.clear();
                     dom.byId('result').innerHTML = ''
                     var symbol = null;
 
                     domCon.create('label', {
-                        innerHTML: "数量："+e.length
+                        innerHTML: "数量：" + e.length
                     }, dom.byId('result'));
                     domCon.create('br', {}, dom.byId('result'));
                     for (var i = 0; i < e.length; i++) {
@@ -208,6 +299,8 @@
                         domCon.create('br', {}, dom.byId('result'));
                         domCon.create('br', {}, dom.byId('result'));
                     }
+                },function (error) {
+                    dom.byId('result').innerHTML = error
                 })
             }
 
@@ -226,19 +319,17 @@
 <body>
     <div id="mapDiv" class="MapClass"></div>
     <div id="panel" class="panelClass" style="font-size: 20px; overflow-y:scroll;WORD-WRAP:break-word">
-        <button id="Query">查询</button>
         <button id="Draw">绘制区域</button>
         <button id="clearDraw">清除区域</button>
         <br>
-        <label>Layers:</label>
-        <input type="text" id="Layers" value="50,57" size="75">
-        <br>
         <label>Layer Definitions:</label>
-        <input type="text" id="LayerDefinitions" value="50:QDM='思明区'" size="60">
+        <input type="text" id="LayerDefinitions" value="" size="60" placeholder="">
         <br>
+
         <label>Tolerance:</label>
-        <input type="text" id="tolerance" value="3">
+        <input type="text" id="tolerance" value="" placeholder="3">
         <br>
+
         <label>layerOption:</label>
         <select id="layerOption">
             <option value="LAYER_OPTION_ALL" selected="true">LAYER_OPTION_ALL</option>
@@ -246,17 +337,26 @@
             <option value="LAYER_OPTION_VISIBLE">LAYER_OPTION_VISIBLE</option>
         </select>
         <br>
+
         <label>Max Allowable Offset:</label>
-        <input type="text" id="maxAllowableOffset" value="">
+        <input type="text" id="maxAllowableOffset" value="" placeholder="">
         <br>
+
         <label>Geometry Precision:</label>
-        <input type="text" id="GeometryPrecision" value="">
+        <input type="text" id="GeometryPrecision" value="" placeholder="">
+        <br>
+        <button id="Query">查询</button>
+        <br>
         <br>
         <label>查询结果:</label>
         <br>
         <div id="result">
         </div>
     </div>
+    <div id="selector">
+        <span class="mr-selector" style="text-align: center">图层组</span>
+        <ul class="select">
+        </ul>
     </div>
 </body>
 
