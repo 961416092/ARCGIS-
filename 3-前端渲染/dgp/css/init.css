@@ -1,0 +1,28 @@
+@import "semantic.css";
+@import "minicolors.css";
+@import url(../dijit/css/HeadWidget.css);
+@import url(../../widgets/RightPanel/style.css);
+
+body {
+    background:rgb(238, 238, 238);
+    margin:0;
+    min-width: 900px;
+    font-family: Myriad, Helvetica, Tahoma, Arial, clean, sans-serif !important;
+}
+
+#main-page {
+    background:rgb(238, 238, 238);
+    position: absolute;
+}
+
+.wh100 {
+    width: 100%;
+    height: 100%;
+}
+
+.map{
+    position: absolute; 
+    width: 100%;
+    height: calc(100% - 43px);
+    bottom: 0;
+}
