@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no" />
+    <title>ScaleDependentRender</title>
+    <link rel="stylesheet" type="text/css" href="http://localhost/arcgis_js_v325_api/esri/css/esri.css" />
+    <style>
+        html,
+        body,
+        #map {
+            height: 100%;
+            margin: 0;
+        }
+
+        #info {
+            position: absolute;
+            right: 0;
+            top: 0;
+            padding: 1em 1em 0 1em;
+            background: #fff;
+            font: 14px sans-serif;
+            width: 200px;
+            text-align: center;
+            border-radius: 0 0 0 10px;
+        }
+    </style>
+    <script src="http://localhost/arcgis_js_v325_api/init.js"></script>
+    <script>
+        var map;
+        require([
+            "esri/map",
+            "esri/layers/ArcGISDynamicMapServiceLayer",
+            "esri/layers/ArcGISTiledMapServiceLayer",
+            "dojo/on",
+            "dojo/_base/declare",
+            'esri/request',
+            "esri/geometry/Extent",
+            "esri/SpatialReference",
+            'dojo/Deferred',
+            "dojo/dom",
+            'dojo/dom-style',
+            "dojo/dom-construct",
+            "esri/Color",
+            "esri/InfoTemplate",
+            "esri/tasks/query",
+            "dojo/_base/lang",
+            'esri/layers/FeatureLayer',
+            "esri/layers/LayerDrawingOptions",
+            "esri/symbols/SimpleLineSymbol",
+            "esri/symbols/SimpleFillSymbol",
+            "esri/symbols/SimpleMarkerSymbol",
+            'esri/renderers/SimpleRenderer',
+            'esri/renderers/ClassBreaksRenderer',
+            'esri/renderers/HeatmapRenderer',
+            "esri/renderers/UniqueValueRenderer",
+            "esri/renderers/DotDensityRenderer",
+            "esri/renderers/ScaleDependentRenderer",
+            "dojo/_base/array",
+            "dojo/dom",
+            "esri/renderers/BlendRenderer", "dojo/domReady!"
+        ], function (
+            Map,
+            ArcGISDynamicMapServiceLayer,
+            ArcGISTiledMapServiceLayer,
+            on,
+            declare,
+            esriRequest,
+            Extent,
+            SpatialReference,
+            Deferred,
+            dom,
+            domStyle,
+            domCon,
+            Color,
+            InfoTemplate,
+            Query,
+            lang,
+            FeatureLayer,
+            LayerDrawingOptions,
+            SimpleLineSymbol,
+            SimpleFillSymbol,
+            SimpleMarkerSymbol,
+            SimpleRenderer,
+            ClassBreaksRenderer,
+            HeatmapRenderer,
+            UniqueValueRenderer,
+            DotDensityRenderer,
+            ScaleDependentRenderer,
+            array,
+            dom,
+            BlendRenderer,
+        ) {
+            var map = new Map("map", {
+                extent: new Extent(521223, 2677120, 742440, 2772171, new SpatialReference({ wkid: 4548 }))
+            });
+
+            var basemap = new ArcGISTiledMapServiceLayer("http://192.168.1.146:6080/arcgis/rest/services/XMGHY/chinamap/MapServer/");
+            map.addLayer(basemap);
+
+            var layer = new FeatureLayer("http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer/46", {
+                outFields: ["*"],
+                infoTemplate: new InfoTemplate("${OBJECTID}", "${*}")
+            });
+
+            // update the alias for the field being mapped so it 
+            // displays nicely in the legend
+            map.on("zoom-end", function (e) {
+                var Scale = map.getScale();
+                if (Scale<300000) {
+                    layer.setRenderer(renderer1);
+                } else {
+                    layer.setRenderer(renderer2);
+                }
+            });
+
+            var symbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID,
+                new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID,
+                    new Color([0, 0, 0]), 3),
+                new Color([0, 0, 255])
+            );
+
+            var renderer1 = new SimpleRenderer(symbol);
+
+            var symbol = new SimpleFillSymbol(SimpleFillSymbol.STYLE_SOLID,
+                new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID,
+                    new Color([0, 0, 0]), 3),
+                new Color([255, 0, 0])
+            );
+
+            var renderer2 = new SimpleRenderer(symbol);
+            layer.setRenderer(renderer2);
+
+            map.addLayers([layer]);
+        });
+    </script>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div id="info">
+        <div id="legend"></div>
+    </div>
+</body>
+
+</html>

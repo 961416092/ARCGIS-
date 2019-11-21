@@ -1,7 +1,7 @@
 @import "semantic.css";
 @import "minicolors.css";
 @import url(../dijit/css/HeadWidget.css);
-@import url(../../widgets/RightPanel/style.css);
+@import url(../../widgets/RenderPanel/style.css);
 
 body {
     background:rgb(238, 238, 238);

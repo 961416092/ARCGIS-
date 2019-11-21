@@ -9,11 +9,11 @@
 
 
 #rightPane {
-    width: 0px;
+    width: 550px;
     height: calc(100% - 45px);
     position: absolute;
     top: 43px;
-    right: -400px;
+    right: -550px;
     color: #323232;
     background-color: rgb(255, 255, 255);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);

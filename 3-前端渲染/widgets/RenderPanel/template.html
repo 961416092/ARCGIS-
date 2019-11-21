@@ -1,0 +1,100 @@
+<div>
+    <div id="rightPane">
+        <div class="rasterAnalysisTitle">
+            <span style="font-size: 16px">前端渲染</span>
+        </div>
+
+        <br>
+        <div>
+            <div class="ui large label">
+                简单渲染
+            </div>
+            <button class="ui button blue Dynamic" value="42">添加图层</button>
+            <button class="ui button blue Feature" value="42">添加要素图层</button>
+            <button class="ui button red" data-dojo-attach-event="onclick:simple">渲染</button>
+            <select name="" id="simple">
+                <option value="0">普通</option>
+                <option value="1">color</option>
+                <option value="2">opacity</option>
+                <option value="3">size</option>
+                <option value="4">组合拳</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <div class="ui large label">
+                分级渲染
+            </div>
+            <button class="ui button blue Dynamic" value="46">添加图层</button>
+            <button class="ui button blue Feature" value="46">添加要素图层</button>
+            <button class="ui button red" data-dojo-attach-event="onclick:ClassBreaks">渲染</button>
+            <select name="" id="ClassBreaks">
+                <option value="0">普通</option>
+                <option value="1">normalizationTotal</option>
+                <option value="2">normalizationField</option>
+                <option value="3">VisualVariables</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <div class="ui large label">
+                唯一值渲染
+            </div>
+            <button class="ui button blue Dynamic" value="1">添加图层</button>
+            <button class="ui button blue Feature" value="1">添加要素图层</button>
+            <button class="ui button red" data-dojo-attach-event="onclick:UniqueValue">渲染</button>
+            <select name="" id="UniqueValue">
+                <option value="0">普通</option>
+                <option value="1">calculateField</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <div class="ui large label">
+                混合渲染
+            </div>
+            <button class="ui button blue Dynamic" value="46">添加图层</button>
+            <button class="ui button blue Feature" value="46">添加要素图层</button>
+            <button class="ui button red" data-dojo-attach-event="onclick:Blend">渲染</button>
+            <select name="" id="Blend">
+                <option value="0">普通</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <div class="ui large label">
+                热力图渲染
+            </div>
+            <button class="ui button blue Dynamic" value="50">添加图层</button>
+            <button class="ui button blue Feature" value="50">添加要素图层</button>
+            <button class="ui button red" data-dojo-attach-event="onclick:Heatmap">渲染</button>
+            <select name="" id="Heatmap">
+                <option value="0">普通</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <div class="ui large label">
+                点密度渲染
+            </div>
+            <button class="ui button blue Dynamic" value="46">添加图层</button>
+            <button class="ui button blue Feature" value="46">添加要素图层</button>
+            <button class="ui button red" data-dojo-attach-event="onclick:DotDensity">渲染</button>
+            <select name="" id="DotDensity">
+                <option value="0">普通</option>
+            </select>
+        </div>
+        <br>
+        <div>
+            <div class="ui large label">
+                比例尺分级渲染
+            </div>
+            <button class="ui button blue Dynamic" value="46">添加图层</button>
+            <button class="ui button blue Feature" value="46">添加要素图层</button>
+            <button class="ui button red" data-dojo-attach-event="onclick:ScaleDependent">渲染</button>
+            <select name="" id="ScaleDependent">
+                <option value="0">普通</option>
+            </select>
+        </div>
+    </div>
+</div>

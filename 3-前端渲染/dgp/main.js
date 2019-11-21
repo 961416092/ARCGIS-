@@ -8,6 +8,7 @@ define([
   'dojo/dom-style',
   'dojo/_base/html',
   'dgp/dijit/HeadWidget',
+  'widgets/RenderPanel/renderer'
 ], function (
   lang,
   on,
@@ -17,7 +18,8 @@ define([
   domReady,
   domStyle,
   html,
-  HeadWidget
+  HeadWidget,
+  rendererWidget
 ) {
   var mo = {};
 
@@ -29,13 +31,13 @@ define([
   function initApp() {
     headWidget = new HeadWidget();
     headWidget.placeAt(dgpConfig.mainPageId);
-    require(['widgets/RightPanel/rasterAnalysis'], function (rasterAnalysis) {
-      headWidget.startup();
-      rasterAnalysis = new rasterAnalysis({
-        map: window.map
-      }, "RightPanel");
-      rasterAnalysis.startup();
-    });
+    // require(['widgets/RenderPanel/renderer'], function (rendererWidget) {
+    headWidget.startup();
+    var renderer = new rendererWidget({
+      map: window.map
+    }, "RightPanel");
+    renderer.startup();
+    // });
   };
 
   mo.initApp = initApp;

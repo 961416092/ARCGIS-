@@ -1,6 +1,7 @@
 define([
   "esri/map",
   "esri/layers/ArcGISDynamicMapServiceLayer",
+  "esri/layers/ArcGISTiledMapServiceLayer",
   "dojo/dom",
   'dojo/_base/declare',
   'dojo/_base/lang',
@@ -13,6 +14,8 @@ define([
   'dojo/query',
   'dijit/_WidgetBase',
   'dojo/Evented',
+  "esri/geometry/Extent",
+  "esri/SpatialReference",
   'dojo/Deferred',
   'dojo/on',
   'dojo/topic',
@@ -22,6 +25,7 @@ define([
 ], function (
   Map,
   ArcGISDynamicMapServiceLayer,
+  ArcGISTiledMapServiceLayer,
   dom,
   declare,
   lang,
@@ -34,6 +38,8 @@ define([
   query,
   _WidgetBase,
   Evented,
+  Extent,
+  SpatialReference,
   Deferred,
   on,
   topic,
@@ -54,20 +60,20 @@ define([
       on(dom.byId("rasterbutton"), "click", lang.hitch(this, function () {
         if (this.isrightSlibarOpen) {
           domStyle.set(dom.byId("rightPane"), "transform", "translateX(0px)")
-          domStyle.set(dom.byId("rightPane"), "width", "0")
+          // domStyle.set(dom.byId("rightPane"), "width", "0")
           this.isrightSlibarOpen = false;
 
         } else {
           this.isrightSlibarOpen = true;
-          domStyle.set(dom.byId("rightPane"), "transform", "translateX(-400px)")
-          domStyle.set(dom.byId("rightPane"), "width", "400px")
+          domStyle.set(dom.byId("rightPane"), "transform", "translateX(-550px)")
+          // domStyle.set(dom.byId("rightPane"), "width", "500px")
         }
       })
       );
     },
 
     startup: function () {
-      window.map = new Map("map",
+      var map = new Map("map",
         {
           // basemap: "satellite",
           // basemap: "streets",
@@ -77,10 +83,15 @@ define([
           logo: false,
         });
 
-      var basemap = new ArcGISDynamicMapServiceLayer(window.appInfo.basemapURL);
+      window.map = map;
+
+      var basemap = new ArcGISTiledMapServiceLayer(window.appInfo.basemapURL);
       window.map.addLayer(basemap);
 
-      var DynamicLayer = new ArcGISDynamicMapServiceLayer("http://192.168.1.146:6080/arcgis/rest/services/XMGHY/XMGHYZT/MapServer",{
+      var extent = new Extent(521223, 2677120, 742440, 2772171,new SpatialReference({ wkid:4548 }));
+      window.map.setExtent(extent)
+
+      var DynamicLayer = new ArcGISDynamicMapServiceLayer(window.appInfo.mapServerURL,{
         id:"DynamicLayer"
       });
       DynamicLayer.setVisibleLayers([]);
